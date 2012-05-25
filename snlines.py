@@ -60,9 +60,9 @@ if (opts.xrange):
    xrange = [x1,x2]
 
 if (opts.yrange):
-   xx = opts.yrange.split(',')
-   x1 = float(xx[0])
-   x2 = float(xx[1])
+   yy = opts.yrange.split(',')
+   y1 = float(yy[0])
+   y2 = float(yy[1])
    yrange = [y1,y2]
 
 
