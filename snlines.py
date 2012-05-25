@@ -83,7 +83,8 @@ for line in f:
             El  = np.append(El,float(data[2]))
 
 # check for line number
-if (len(lam) == 0):
+nlines = len(lam)
+if (nlines == 0):
     print "No lines for that element found in this wavelength range"
     exit()
 
@@ -140,8 +141,11 @@ while (1):
         vel = float(input("new velocity (in km/s): "))
         
     if (do == 'a'): 
-        print "adding: %10.3e %10.3e %10.3e %10.3e" % (lam[i],gf[i],El[i],tau[i])
-        nshow = nshow + 1
+        if (nshow == nlines): print "No more lines to add"
+        else:
+            nshow = nshow + 1
+            print "adding: %10.3e %10.3e %10.3e %10.3e" % (lam[nshow],gf[nshow],El[nshow],tau[nshow])
+
         
     if (do == 'r'): nshow = nshow - 1
     
