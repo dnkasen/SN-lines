@@ -160,7 +160,7 @@ while (1):
         print "r = remove a line"
         print "l = list all current lines"
         print "d = increase velocity (blueshift)"
-        print "f = decrease velocity (blueshift)"
+        print "f = decrease velocity (redshift)"
         print "v = reset the velocity by hand"
         print "q = quit"
         
