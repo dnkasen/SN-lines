@@ -2,23 +2,26 @@
 import optparse
 import numpy as np
 import pylab as py
+import cPickle as pickle
+from collections import deque
 
 #########################################################
 # Code for spectral line identification
 # overplots a spectrum 
 #########################################################
 
+# some useful naming data
+romannums = ('I','II','III', 'IV')
+elements = ('H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni','Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'I', 'Te', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U')
 
 py.ion()
-linefile = "kurucz_cd23_cut.dat"
+pklfile = "kurucz.pkl"
 
 # get command line arguments
 parser = optparse.OptionParser()
 parser.add_option("-v",dest="v_init")
 parser.add_option("-t",dest="t_init")
 parser.add_option("-n",dest="n_init")
-parser.add_option("-z",dest="Z_init")
-parser.add_option("-Z",dest="Z_init")
 parser.add_option("--xr",dest="xrange")
 parser.add_option("--yr",dest="yrange")
 
@@ -36,23 +39,12 @@ if (len(args)  == 0):
     print "You need to specify a spectrum file on the command line"
     exit()
 
-# Get element Z and ionization stage (0 is neutral)
-if (opts.Z_init):
-    zz = opts.Z_init.split('.')
-    elem = int(zz[0])
-    ion  = int(zz[1])
-    print 'elem = ' + str(elem) + '; ion = ' + str(ion)
-else:
-    elem = int(input("element (atomic number Z): "))
-    ion  = int(input("ion stage (0 for neutral): "))    
-
 # read input spectrum
-data  = np.loadtxt(args[0])
-xspec = data[:,0]
-yspec = data[:,1]
+xspec, yspec  = np.loadtxt(args[0], unpack = True)
 yrange = (0,1.1*max(yspec))
 xrange = (min(xspec),max(xspec))
 
+# override the data ranges if set from command line
 if (opts.xrange):
    xx = opts.xrange.split(',')
    x1 = float(xx[0])
@@ -65,104 +57,158 @@ if (opts.yrange):
    y2 = float(yy[1])
    yrange = [y1,y2]
 
-
-# read line list
-f = open(linefile)
-lam  = np.zeros(0)
-gf   = np.zeros(0)
-El   = np.zeros(0)
-for line in f:
-    data = line.split()
-    e = int(data[3])
-    i = int(data[4])
-    if (e == elem and i == ion):
-        l = float(data[0])
-        if (l > xrange[0] and l < xrange[1]):
-            lam = np.append(lam,l)
-            gf  = np.append(gf,float(data[1]))
-            El  = np.append(El,float(data[2]))
-
-# check for line number
-nlines = len(lam)
-if (nlines == 0):
-    print "No lines for that element found in this wavelength range"
-    exit()
-
-# compute (relative) sobolev optical depths assuming LTE
-# (depends on oscilator strength and boltzmann factor)
-k_B = 8.61733e-5
-tau = lam*gf*np.exp(-El/k_B/temp)
-tau = tau/tau.max()
-
-# sort lines by sobolev optical depth
-ind = tau.argsort()
-ind = ind[::-1]
-tau = tau[ind]
-lam = lam[ind]
-gf  = gf[ind]
-El  = El[ind]
-
+# read in line data, pickled by pickedata.py
+with open(pklfile, 'rb') as f:
+    linedict = pickle.load(f)
 
 # plot it up
 print "Using temperature " + str(temp) + " K",
 print " and velocity " + str(vel) + " cm/s"
 print "go for it (press ? for help, q to quit)"
+
+# we start with no species
+states = {}
+specids = deque()
+
 while (1):
 
     py.clf()
     py.plot(xspec,yspec)
 
+    # make sure that things are set ok for active region
+    try:
+        active = specids[-1]
+    except IndexError:
+        active = None
+
     # overplot lines
-    for i in range(nshow):
-        lam_obs = lam[i]*(1 - vel/3e5)
-        x = [lam_obs,lam_obs]
-        py.plot(x,yrange,color='black')
+    for id in specids:
+
+        if id == active:
+            color = 'red'
+        else:
+            color = 'black'
+
+        state = states[id]
+
+        for lam in state['lines'][:state['nshow']]:
+            lam_obs = lam*(1 - state['vel']/3e5)
+            x = [lam_obs,lam_obs]
+            
+            py.plot(x,yrange,color=color)
 
     py.xlabel('wavelength')
     py.ylabel('flux')
-    py.title('vel = ' + str(vel) + ' km/s; Z = ' + str(elem) + '; ion = ' + str(ion))
+    if active is not None:
+        py.title(states[active]['name'] + '; vel = ' + str(states[active]['vel']) + ' km/s')
              
-
     py.ylim(yrange)
     py.xlim(xrange)
     py.show()
 
-    # get next command
+    # get next command and break into command and args
     do = raw_input(">")
+    try:
+        docmd,doargs = do.split(' ', 1)
+    except ValueError:
+        docmd = do
+        doargs = None
 
-    if (do == 'q'): break;
-    if (do == 'd'): 
-        vel = vel + 1e3
-        print 'velocity = ' + str(vel) + ' km/s'
-    if (do == 'f'): 
-        vel = vel - 1e3
-        print 'velocity = ' + str(vel) + ' km/s'
-    if (do == 'v'):
-        vel = float(input("new velocity (in km/s): "))
-        
-    if (do == 'a'): 
-        if (nshow == nlines): print "No more lines to add"
+    if (docmd == 'q'): break;
+
+    if (docmd == 'n'):
+        e, i = doargs.split(' ')
+        newid = (int(e),int(i))
+        if newid in linedict:
+            specids.append(newid)
+
+            # start with one line showing 
+            # and put it at the velocity of the previous active line
+            if active is None:
+                newvel = vel
+            else:
+                newvel = states[active]['vel']
+
+
+            name = " ".join((elements[newid[0]-1], 
+                             romannums[newid[1]]))
+
+            lam = linedict[newid]['lam']
+            lines = lam[(lam > xrange[0]) & (lam < xrange[1])]
+
+            states[newid] = {'vel': newvel, 
+                             'nshow': 1,
+                             'name': name,
+                             'lines': lines}
         else:
-            print "adding: %10.3e %10.3e %10.3e %10.3e" % (lam[nshow],gf[nshow],El[nshow],tau[nshow])
-            nshow = nshow + 1
+            print("No such line found in {}".format(pklfile))
 
 
+    if (docmd == 'c'):
+        try:
+            nr = int(doargs)
+        except (TypeError, ValueError):
+            nr = 1
+        specids.rotate(nr)
+
+    if (docmd == 'k') and len(specids) >= 1:
+        specids.pop()
+                       
+    if (docmd == 'd') and (active is not None): 
+        states[active]['vel'] += 1e3
+        print('velocity = ' + str(states[active]['vel']) + ' km/s')
+    if (docmd == 'f') and (active is not None): 
+        states[active]['vel'] -= 1e3
+        print('velocity = ' + str(states[active]['vel']) + ' km/s')
+    if (docmd == 'v') and (active is not None):
+        states[active]['vel'] = float(input("new velocity (in km/s): "))
         
-    if (do == 'r'): nshow = nshow - 1
-    
-    if (do == 'l'):
-        print "   lambda        gf       E_low      tau"
-        for i in range(nshow):
-            print "%10.3e %10.3e %10.3e %10.3e" % (lam[i],gf[i],El[i],tau[i])
+    if (docmd == 'a') and (active is not None): 
 
-    if (do == '?'):
-        print "a = add a line"
-        print "r = remove a line"
-        print "l = list all current lines"
-        print "d = increase velocity (blueshift)"
-        print "f = decrease velocity (redshift)"
-        print "v = reset the velocity by hand"
-        print "q = quit"
+        try:
+            nl = int(doargs)
+        except (TypeError, ValueError):
+            nl = 1
+
+        states[active]['nshow'] = min(states[active]['nshow']+nl,
+                                      len(states[active]['lines']))
+
+    if (docmd == 'r') and (active is not None):
+
+        try:
+            nl = int(doargs)
+        except (TypeError, ValueError):
+            nl = 1
+
+        states[active]['nshow'] = max(1,states[active]['nshow']-nl)
+
+    if (docmd == 'e'):
+        for id in specids:
+            print("%4s %10.3e" % (name, states[id]['vel']))
+
+    if (docmd == 'l'):
+        print "   lambda        gf       E_low      tau"
+        for id in specids:
+            print("%4s @ vel = %10.3e km/s" % (name, states[id]['vel']))
+            for line in states[id]['lines'][:states[id]['nshow']]:
+#            print "%10.3e %10.3e %10.3e %10.3e" % (lam[i],gf[i],El[i],tau[i])
+                print(line)
+
+    if (docmd == '?'):
+        print("n #1 #2 = add element #1 with ionization state #2")
+        print("c (#) = cycle the active species")
+        print("k = remove active species")
+        print("e = list all species")
+
+        print("a (#) = add line(s) to active species")
+        print("r (#) = remove line(s) from active species")
+        print("l = list all current lines")
+
+        print("d = increase velocity (blueshift)")
+        print("f = decrease velocity (redshift)")
+        print("v = reset the velocity by hand")
+
+        print("q = quit")
         
 
 
