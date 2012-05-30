@@ -189,7 +189,7 @@ while (1):
     if (docmd == 'l'):
         print "   lambda        gf       E_low      tau"
         for id in specids:
-            print("%4s @ vel = %10.3e km/s" % (name, states[id]['vel']))
+            print("%4s @ vel = %10.3e km/s" % (states[id]['name'], states[id]['vel']))
             for line in states[id]['lines'][:states[id]['nshow']]:
 #            print "%10.3e %10.3e %10.3e %10.3e" % (lam[i],gf[i],El[i],tau[i])
                 print(line)
