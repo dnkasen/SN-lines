@@ -19,20 +19,13 @@ pklfile = "kurucz.pkl"
 
 # get command line arguments
 parser = optparse.OptionParser()
-parser.add_option("-v",dest="v_init")
-parser.add_option("-t",dest="t_init")
-parser.add_option("-n",dest="n_init")
+parser.add_option("-v", dest="vel", type="float", default=1e4)
+parser.add_option("-t", dest="temp", type="float", default=1e4)
 parser.add_option("--xr",dest="xrange")
 parser.add_option("--yr",dest="yrange")
 
 # set defaults, if not specified
 (opts, args) = parser.parse_args()
-if (opts.v_init): vel  = float(opts.v_init)
-else: vel = 1e4
-if (opts.t_init): temp = float(opts.t_init)
-else: temp = 1e4
-if (opts.n_init): nshow = int(opts.n_init)
-else: nshow = 1
 
 # check for spectrum file
 if (len(args)  == 0):
@@ -45,13 +38,13 @@ yrange = (0,1.1*max(yspec))
 xrange = (min(xspec),max(xspec))
 
 # override the data ranges if set from command line
-if (opts.xrange):
+if opts.xrange is not None:
    xx = opts.xrange.split(',')
    x1 = float(xx[0])
    x2 = float(xx[1])
    xrange = [x1,x2]
 
-if (opts.yrange):
+if opts.yrange is not None:
    yy = opts.yrange.split(',')
    y1 = float(yy[0])
    y2 = float(yy[1])
@@ -62,8 +55,8 @@ with open(pklfile, 'rb') as f:
     linedict = pickle.load(f)
 
 # plot it up
-print "Using temperature " + str(temp) + " K",
-print " and velocity " + str(vel) + " cm/s"
+print "Using temperature " + str(opts.temp) + " K",
+print " and velocity " + str(opts.vel) + " cm/s"
 print "go for it (press ? for help, q to quit)"
 
 # we start with no species
@@ -125,7 +118,7 @@ while (1):
             # start with one line showing 
             # and put it at the velocity of the previous active line
             if active is None:
-                newvel = vel
+                newvel = opts.vel
             else:
                 newvel = states[active]['vel']
 
@@ -146,7 +139,7 @@ while (1):
             # shift from reference temperature to temp
             k_B = 8.61733e-5
             tref = 1e4
-            El = El * np.exp(El/k_B/tref) * np.exp(-El/k_B/temp)
+            El = El * np.exp(El/k_B/tref) * np.exp(-El/k_B/opts.temp)
 
             # pack this all in a dictionary
             states[newid] = {'vel': newvel, 
