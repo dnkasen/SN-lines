@@ -91,7 +91,7 @@ while (1):
 
         state = states[id]
 
-        for lam in state['lines'][:state['nshow']]:
+        for lam in state['lam'][:state['nshow']]:
             lam_obs = lam*(1 - state['vel']/3e5)
             x = [lam_obs,lam_obs]
             
@@ -133,13 +133,29 @@ while (1):
             name = " ".join((elements[newid[0]-1], 
                              romannums[newid[1]]))
 
-            lam = linedict[newid]['lam']
-            lines = lam[(lam > xrange[0]) & (lam < xrange[1])]
+            
+            # here are lines we even want to consider
 
+            lam = linedict[newid]['lam']
+            tau = linedict[newid]['tau']
+            gf = linedict[newid]['gf']
+            El = linedict[newid]['El']
+
+            lamslice = (lam > xrange[0]) & (lam < xrange[1])
+
+            # shift from reference temperature to temp
+            k_B = 8.61733e-5
+            tref = 1e4
+            El = El * np.exp(El/k_B/tref) * np.exp(-El/k_B/temp)
+
+            # pack this all in a dictionary
             states[newid] = {'vel': newvel, 
                              'nshow': 1,
                              'name': name,
-                             'lines': lines}
+                             'lam': lam[lamslice], 
+                             'tau': tau[lamslice], 
+                             'gf': gf[lamslice], 
+                             'El' : El[lamslice]}
         else:
             print("No such line found in {}".format(pklfile))
 
@@ -171,7 +187,7 @@ while (1):
             nl = 1
 
         states[active]['nshow'] = min(states[active]['nshow']+nl,
-                                      len(states[active]['lines']))
+                                      len(states[active]['lam']))
 
     if (docmd == 'r') and (active is not None):
 
@@ -190,9 +206,12 @@ while (1):
         print "   lambda        gf       E_low      tau"
         for id in specids:
             print("%4s @ vel = %10.3e km/s" % (states[id]['name'], states[id]['vel']))
-            for line in states[id]['lines'][:states[id]['nshow']]:
-#            print "%10.3e %10.3e %10.3e %10.3e" % (lam[i],gf[i],El[i],tau[i])
-                print(line)
+            for i in range(states[id]['nshow']):
+                print(" %10.3e %10.3e %10.3e %10.3e" % (states[id]['lam'][i],
+                                                        states[id]['gf'][i],
+                                                        states[id]['El'][i],
+                                                        states[id]['tau'][i]))
+
 
     if (docmd == '?'):
         print("n #1 #2 = add element #1 with ionization state #2")
