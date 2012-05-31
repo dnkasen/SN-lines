@@ -184,7 +184,7 @@ while (1):
 
     if (docmd == 'e'):
         for id in specids:
-            print("%4s %10.3e" % (name, states[id]['vel']))
+            print("%4s %10.3e" % (states[id]['name'], states[id]['vel']))
 
     if (docmd == 'l'):
         print "   lambda        gf       E_low      tau"
