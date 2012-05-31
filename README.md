@@ -5,7 +5,7 @@ Code for line ID
 
 snlines.py
 ----------
-This is the main code. Run by executing /snlines.py <filename>, where <filename> is a 2 column (wavelength, intensity) text file.
+This is the main code. Run by executing /snlines.py _filename_, where _filename_ is a 2 column (wavelength, intensity) text file.
 
 pickledata.py
 -------------
